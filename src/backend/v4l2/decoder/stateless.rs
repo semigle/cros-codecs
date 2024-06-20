@@ -19,6 +19,10 @@ use crate::DecodedFormat;
 use crate::Resolution;
 
 use crate::device::v4l2::stateless::buffer::V4l2CaptureDqBuf;
+use crate::device::v4l2::stateless::controls::h264::V4l2CtrlH264DecodeParams;
+use crate::device::v4l2::stateless::controls::h264::V4l2CtrlH264Pps;
+use crate::device::v4l2::stateless::controls::h264::V4l2CtrlH264ScalingMatrix;
+use crate::device::v4l2::stateless::controls::h264::V4l2CtrlH264Sps;
 use crate::device::v4l2::stateless::device::V4l2Device;
 use crate::device::v4l2::stateless::queue::V4l2CaptureQueue;
 use crate::device::v4l2::stateless::queue::V4l2OutputQueue;
@@ -30,6 +34,12 @@ pub struct V4l2Picture {
 
     // FIXME: This is temporary hack to ensure picture ready
     pub backend: *mut V4l2StatelessDecoderBackend,
+
+    // TODO: These are H264 codec specific data only.
+    pub h264_sps: V4l2CtrlH264Sps,
+    pub h264_pps: V4l2CtrlH264Pps,
+    pub h264_scaling_matrix: V4l2CtrlH264ScalingMatrix,
+    pub h264_decode_params: V4l2CtrlH264DecodeParams,
 }
 
 impl<'a> MappableHandle for std::cell::Ref<'a, V4l2Picture> {

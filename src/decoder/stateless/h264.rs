@@ -6,6 +6,8 @@
 mod dummy;
 #[cfg(feature = "vaapi")]
 mod vaapi;
+#[cfg(feature = "v4l2")]
+mod v4l2;
 
 use std::collections::btree_map::Entry;
 use std::io::Cursor;
