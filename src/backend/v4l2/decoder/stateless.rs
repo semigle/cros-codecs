@@ -31,6 +31,7 @@ pub struct V4l2Picture {
     // TODO: consider enum to handle generic picture states
     pub timestamp: u64,
     pub buf: Option<V4l2CaptureDqBuf>,
+    pub ref_pic_list: Vec<Rc<RefCell<V4l2Picture>>>,
 
     // FIXME: This is temporary hack to ensure picture ready
     pub backend: *mut V4l2StatelessDecoderBackend,
@@ -200,12 +201,18 @@ impl V4l2StatelessDecoderBackend {
                     match self.cur_pic_list.remove(&(buf.data.timestamp().tv_usec as u64)) {
                          Some(picture) => {
                              picture.borrow_mut().buf = Some(buf);
+                             picture.borrow_mut().ref_pic_list.clear();
                          }
                          _ => todo!(),
                     }
                 }
                 _ => break,
             }
+        }
+        while self.capture_queue.num_free_buffers() != 0 {
+            let buf = self.capture_queue.alloc_buffer();
+            println!("capture >> index: {}\n", buf.index());
+            buf.queue().expect("Failed to queue capture buffer");
         }
     }
 }
@@ -226,15 +233,7 @@ impl FramePool for V4l2StatelessDecoderBackend {
     }
 
     fn num_free_frames(&self) -> usize {
-        let free_output_buffers = self.output_queue.num_free_buffers();
-        let free_capture_buffers = self.capture_queue.num_free_buffers();
-        let free_frames = if free_capture_buffers < free_output_buffers {
-            free_capture_buffers
-        } else {
-            free_output_buffers
-        };
-        println!("{:<20} {:?} ({}, {})\n", "free_frames", free_frames, free_output_buffers, free_capture_buffers);
-        free_frames
+        self.output_queue.num_free_buffers()
     }
 
     fn num_managed_frames(&self) -> usize {

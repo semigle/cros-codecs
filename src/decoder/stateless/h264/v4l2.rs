@@ -45,6 +45,7 @@ impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
             timestamp,
             buf: None,
             backend: self,
+            ref_pic_list: Vec::<Rc<RefCell<V4l2Picture>>>::new(),
             h264_sps: Default::default(),
             h264_pps: Default::default(),
             h264_scaling_matrix: Default::default(),
@@ -74,6 +75,8 @@ impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
     ) -> StatelessBackendResult<()> {
 
         let mut dpb_entries = Vec::<V4l2CtrlH264DpbEntry>::new();
+        let mut ref_pic_list = Vec::<Rc<RefCell<V4l2Picture>>>::new();
+
         for entry in dpb.entries() {
             let ref_pic = match &entry.handle {
                 Some(handle) => {
@@ -84,6 +87,7 @@ impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
             dpb_entries.push(V4l2CtrlH264DpbEntry {
                 timestamp: ref_pic.borrow().timestamp, pic: entry.pic.clone()
             });
+            ref_pic_list.push(ref_pic);
         }
 
         let mut picture = picture.borrow_mut();
@@ -93,6 +97,7 @@ impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
             .set_picture_data(picture_data)
             .set_dpb_entries(&dpb_entries)
             .set_slice_header(slice_header);
+        picture.ref_pic_list = ref_pic_list;
 
         ////////////////////////////////////////////////////////////////////////
         // DEBUG
@@ -147,11 +152,6 @@ impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
                .set_data(slice.nalu.as_ref());
 
         request.submit();
-
-        let buf = self.capture_queue.alloc_buffer();
-        println!("capture >> index: {}\n", buf.index());
-        buf.queue().expect("Failed to queue capture buffer");
-
         Ok(())
 
     }
