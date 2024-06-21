@@ -145,8 +145,8 @@ pub struct V4l2StatelessDecoderBackend {
     stream_info: StreamInfo,
 
     pub device: V4l2Device,
-    pub output_queue: V4l2OutputQueue,
-    pub capture_queue: V4l2CaptureQueue,
+    pub output_queue: Option<Rc<RefCell<V4l2OutputQueue>>>,
+    pub capture_queue: Option<Rc<RefCell<V4l2CaptureQueue>>>,
 
     // FIXME: This is temporary hack to ensure picture ready
     pub cur_pic_list: HashMap<u64, Rc<RefCell<V4l2Picture>>>,
@@ -159,8 +159,8 @@ impl V4l2StatelessDecoderBackend {
         const NUM_CAPTURE_BUFFERS: u32 = 8;
 
         let device = V4l2Device::new();
-        let output_queue = V4l2OutputQueue::new(&device, NUM_OUTPUT_BUFFERS);
-        let capture_queue = V4l2CaptureQueue::new(&device, NUM_CAPTURE_BUFFERS);
+        let output_queue = Some(Rc::new(RefCell::new(V4l2OutputQueue::new(&device, NUM_OUTPUT_BUFFERS))));
+        let capture_queue = Some(Rc::new(RefCell::new(V4l2CaptureQueue::new(&device, NUM_CAPTURE_BUFFERS))));
 
         Self {
             stream_info: StreamInfo {
@@ -179,7 +179,11 @@ impl V4l2StatelessDecoderBackend {
     }
 
     pub fn process_output_queue(&self) {
-        let queue = &self.output_queue;
+        let queue = match &self.output_queue {
+            Some(queue) =>
+                queue.borrow(),
+            _ => todo!(),
+        };
         loop {
             match queue.dequeue_buffer() {
                 Some(buf) => {
@@ -191,7 +195,11 @@ impl V4l2StatelessDecoderBackend {
     }
 
     pub fn process_capture_queue(&mut self) {
-        let queue = &self.capture_queue;
+        let queue = match &self.capture_queue {
+            Some(queue) =>
+                queue.borrow(),
+            _ => todo!(),
+        };
         loop {
             match queue.dequeue_buffer() {
                 Some(buf) => {
@@ -209,8 +217,8 @@ impl V4l2StatelessDecoderBackend {
                 _ => break,
             }
         }
-        while self.capture_queue.num_free_buffers() != 0 {
-            let buf = self.capture_queue.alloc_buffer();
+        while queue.num_free_buffers() != 0 {
+            let buf = queue.alloc_buffer();
             println!("capture >> index: {}\n", buf.index());
             buf.queue().expect("Failed to queue capture buffer");
         }
@@ -233,11 +241,19 @@ impl FramePool for V4l2StatelessDecoderBackend {
     }
 
     fn num_free_frames(&self) -> usize {
-        self.output_queue.num_free_buffers()
+        match &self.output_queue {
+            Some(queue) =>
+                queue.borrow().num_free_buffers(),
+            _ => 0,
+        }
     }
 
     fn num_managed_frames(&self) -> usize {
-        self.output_queue.num_buffers()
+        match &self.output_queue {
+            Some(queue) =>
+                queue.borrow().num_buffers(),
+            _ => 0,
+        }
     }
 
     fn clear(&mut self) {

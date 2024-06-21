@@ -24,6 +24,7 @@ use crate::decoder::stateless::StatelessDecoderBackendPicture;
 use crate::decoder::BlockingMode;
 use crate::device::v4l2::stateless::controls::h264::V4l2CtrlH264DecodeMode;
 use crate::device::v4l2::stateless::controls::h264::V4l2CtrlH264DpbEntry;
+use crate::Resolution;
 
 impl StatelessDecoderBackendPicture<H264> for V4l2StatelessDecoderBackend {
     type Picture = Rc<RefCell<V4l2Picture>>;
@@ -31,7 +32,34 @@ impl StatelessDecoderBackendPicture<H264> for V4l2StatelessDecoderBackend {
 
 impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
 
-    fn new_sequence(&mut self, _: &Rc<Sps>) -> StatelessBackendResult<()> {
+    fn new_sequence(&mut self, sps: &Rc<Sps>) -> StatelessBackendResult<()> {
+
+        let mb_unit = 16;
+        let map_unit = 16;
+        let resolution = Resolution::from((
+            (sps.pic_width_in_mbs_minus1 + 1) * mb_unit,
+            (sps.pic_height_in_map_units_minus1 + 1) * map_unit,
+        ));
+
+        let queue = match &self.output_queue {
+            Some(queue) =>
+                queue.clone(),
+            _ => todo!(),
+        };
+        self.output_queue = None;
+        let queue = RefCell::into_inner(Rc::into_inner(queue).expect("ERROR"));
+        self.output_queue = Some(Rc::new(RefCell::new(queue.set_resolution(resolution))));
+
+
+        let queue = match &self.capture_queue {
+            Some(queue) =>
+                queue.clone(),
+            _ => todo!(),
+        };
+        self.capture_queue = None;
+        let queue = RefCell::into_inner(Rc::into_inner(queue).expect("ERROR"));
+        self.capture_queue = Some(Rc::new(RefCell::new(queue.set_resolution(resolution))));
+
         Ok(())
     }
 
@@ -141,7 +169,12 @@ impl StatelessH264DecoderBackend for V4l2StatelessDecoderBackend {
         // TODO: Move request control settings to start_picture
         // TODO: Move request submit to submit_picture
 
-        let buf = self.output_queue.alloc_buffer();
+        let queue = match &self.output_queue {
+            Some(queue) =>
+                queue.borrow(),
+            _ => todo!(),
+        };
+        let buf = queue.alloc_buffer();
         let mut request = self.device.alloc_request(buf);
 
         request.set_timestamp(picture.timestamp)
