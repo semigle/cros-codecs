@@ -191,7 +191,10 @@ impl V4l2OutputQueue {
         match handle {
             V4l2OutputQueueHandle::Streaming(handle) => loop {
                 match handle.try_dequeue() {
-                    Ok(buffer) => continue,
+                    Ok(buffer) => {
+                        println!("output  << index: {}, timestamp: {:?}\n",
+                            buffer.data.index(), buffer.data.timestamp());
+                    },
                     _ => break,
                 }
             },
@@ -321,9 +324,10 @@ impl V4l2CaptureQueue {
         match handle {
             V4l2CaptureQueueHandle::Streaming(handle) =>
                 while handle.num_free_buffers() != 0 {
-                    handle.try_get_free_buffer()
-                        .expect("Failed to alloc capture buffer")
-                        .queue()
+                    let buffer = handle.try_get_free_buffer()
+                            .expect("Failed to alloc capture buffer");
+                    println!("capture >> index: {}\n", buffer.index());
+                    buffer.queue()
                         .expect("Failed to queue capture buffer");
                 }
             _ => panic!("ERROR")

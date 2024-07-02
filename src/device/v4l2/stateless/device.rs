@@ -83,6 +83,7 @@ impl DeviceHandle {
         loop {
             match self.capture_queue.dequeue_buffer() {
                 Some(buffer) => {
+                    println!("capture << index: {}, timestamp: {:?}\n", buffer.index(), buffer.timestamp());
                     self.capture_buffers.insert(
                         buffer.timestamp(), buffer);
                 },
